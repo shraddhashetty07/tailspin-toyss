@@ -24,6 +24,71 @@ test.describe('Game Listing and Navigation', () => {
     });
   });
 
+  test.describe('Game Filtering', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/');
+      await expect(page.getByTestId('games-grid')).toBeVisible();
+    });
+
+    test('filters games by category and syncs the selection to the URL', async ({ page }) => {
+      const categoryFilter = page.getByTestId('category-filter-1');
+
+      await categoryFilter.check();
+
+      await expect(page.getByTestId('filter-status')).toHaveText('Showing 4 games.');
+      await expect(page.locator('[data-testid="game-card"]:not([hidden])')).toHaveCount(4);
+      await expect(page).toHaveURL(/category=1/);
+    });
+
+    test('filters games by publisher', async ({ page }) => {
+      const publisherFilter = page.getByTestId('publisher-filter');
+
+      await publisherFilter.selectOption({ label: 'CodeForge Studios' });
+
+      await expect(page.getByTestId('filter-status')).toHaveText('Showing 6 games.');
+      await expect(page.locator('[data-testid="game-card"]:not([hidden])')).toHaveCount(6);
+      await expect(page).toHaveURL(/publisher=1/);
+    });
+
+    test('combines category and publisher filters', async ({ page }) => {
+      await page.getByTestId('category-filter-1').check();
+      await page.getByTestId('publisher-filter').selectOption({ label: 'CodeForge Studios' });
+
+      await expect(page.getByTestId('filter-status')).toHaveText('Showing 1 game.');
+      await expect(page.locator('[data-testid="game-card"]:not([hidden])')).toHaveCount(1);
+      await expect(page.locator('[data-testid="game-card"]:not([hidden])').getByTestId('game-title')).toHaveText('DevOps Dominion');
+    });
+
+    test('restores filter selections from the URL and clears them', async ({ page }) => {
+      await page.goto('/?category=1&category=2&publisher=1');
+
+      await expect(page.getByTestId('category-filter-1')).toBeChecked();
+      await expect(page.getByTestId('category-filter-2')).toBeChecked();
+      await expect(page.getByTestId('publisher-filter')).toHaveValue('1');
+      await expect(page.getByTestId('filter-status')).toHaveText('Showing 2 games.');
+
+      await page.getByTestId('clear-filters').click();
+
+      await expect(page.getByTestId('filter-status')).toHaveText('Showing 21 games.');
+      await expect(page.getByTestId('category-filter-1')).not.toBeChecked();
+      await expect(page.getByTestId('publisher-filter')).toHaveValue('');
+      await expect(page).toHaveURL('/');
+    });
+
+    test('shows a clearable empty state when filters match no games', async ({ page }) => {
+      await page.goto('/?category=99999');
+
+      await expect(page.getByTestId('filtered-empty')).toBeVisible();
+      await expect(page.getByTestId('filtered-empty-text')).toHaveText('No games match the selected filters.');
+      await expect(page.getByTestId('games-grid')).toBeHidden();
+
+      await page.getByTestId('filtered-empty-clear').click();
+
+      await expect(page.getByTestId('games-grid')).toBeVisible();
+      await expect(page.getByTestId('filter-status')).toHaveText('Showing 21 games.');
+    });
+  });
+
   test('should navigate to correct game details page when clicking on a game', async ({ page }) => {
     let gameId: string | null;
     let gameTitle: string | null;
